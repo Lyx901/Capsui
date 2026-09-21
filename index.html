@@ -722,39 +722,12 @@
   </style>
 </head>
 <body>
-  <section class="login-page" id="login-page">
-    <div class="background"></div>
-    <div class="login-container">
-      <div class="logo-section">
-        <img src="FCU.jpg" alt="Logo" />
-      </div>
-      <div class="portal-title">
-        FCU ELEMENTARY
-        <center>SCHOOL BELL SYSTEM</center>
-      </div>
-      <form id="login-form">
-        <div class="input-group">
-          <input type="text" placeholder="Username" required />
-        </div>
-        <div class="input-group">
-          <input type="password" placeholder="Password" required />
-        </div>
-        <div class="captcha-text">Protected by reCAPTCHA v3</div>
-        <button type="submit" class="login-btn">SIGN IN</button>
-      </form>
-      <div class="footer-text">
-        Don't have an account?
-        <span>Sign Here</span>
-      </div>
-    </div>
-  </section>
-
   <section class="dashboard-page" id="dashboard-page">
     <aside class="sidebar">
       <div>
         <div class="profile-section">
           <img id="profile-avatar" src="pfp.jpg" alt="Profile" />
-          <h2>ADMIN</h2>
+          <h2 id="profile-name">ADMIN</h2>
           <a href="#" class="profile-settings-link" data-view="settings-view">
             <i class="fa-solid fa-gear"></i>
             Settings
@@ -922,22 +895,46 @@
           <div class="card">
             <i class="fa-solid fa-users"></i>
             <h3>Total Users</h3>
-            <p>12</p>
+            <p id="dashboard-user-count">0</p>
           </div>
           <div class="card">
             <i class="fa-solid fa-user-shield"></i>
             <h3>Admin Accounts</h3>
-            <p>3</p>
+            <p id="dashboard-admin-count">0</p>
           </div>
           <div class="card">
             <i class="fa-solid fa-circle-check"></i>
             <h3>Active Users</h3>
-            <p>10</p>
+            <p id="dashboard-active-user-count">0</p>
           </div>
         </section>
 
         <section class="table-section">
-          <h2>Account Overview</h2>
+          <div class="section-heading">
+            <h2>Account Overview</h2>
+            <button type="button" id="dashboard-add-user">Add User</button>
+          </div>
+          <form id="dashboard-user-form" class="schedule-form" hidden>
+            <div class="form-row">
+              <input type="text" id="dashboard-user-username" placeholder="Username" autocomplete="off" required />
+              <input type="password" id="dashboard-user-password" placeholder="Password (min. 6 characters)" autocomplete="new-password" />
+              <select id="dashboard-user-role" aria-label="Role">
+                <option value="Staff">Staff</option>
+                <option value="Administrator">Administrator</option>
+                <option value="Viewer">Viewer</option>
+              </select>
+              <select id="dashboard-user-status" aria-label="Status">
+                <option value="Active">Active</option>
+                <option value="Pending">Pending</option>
+                <option value="Inactive">Inactive</option>
+              </select>
+            </div>
+            <div class="form-actions">
+              <button type="submit">Save User</button>
+              <button type="button" id="dashboard-cancel-user" class="secondary-btn">Cancel</button>
+            </div>
+          </form>
+          <p id="dashboard-user-message" class="message"></p>
           <table>
             <thead>
               <tr>
@@ -948,29 +945,7 @@
                 <th>Action</th>
               </tr>
             </thead>
-            <tbody>
-              <tr>
-                <td>Maria Santos</td>
-                <td>Administrator</td>
-                <td><span class="status-badge active">Active</span></td>
-                <td>Today, 07:20 AM</td>
-                <td><button>Edit</button></td>
-              </tr>
-              <tr>
-                <td>John Cruz</td>
-                <td>Staff</td>
-                <td><span class="status-badge active">Active</span></td>
-                <td>Yesterday, 04:15 PM</td>
-                <td><button>Edit</button></td>
-              </tr>
-              <tr>
-                <td>Rosa Dela Vega</td>
-                <td>Viewer</td>
-                <td><span class="status-badge pending">Pending</span></td>
-                <td>Never</td>
-                <td><button>Approve</button></td>
-              </tr>
-            </tbody>
+            <tbody id="dashboard-user-body"></tbody>
           </table>
         </section>
       </section>
@@ -1144,8 +1119,30 @@
   </section>
 
   <script>
-    const loginForm = document.getElementById("login-form");
-    const loginPage = document.getElementById("login-page");
+    function getStoredValue(key, fallback = null) {
+      try {
+        return localStorage.getItem(key) ?? fallback;
+      } catch {
+        return fallback;
+      }
+    }
+
+    function setStoredValue(key, value) {
+      try {
+        localStorage.setItem(key, value);
+      } catch {
+        // The dashboard can still run when storage is unavailable.
+      }
+    }
+
+    function removeStoredValue(key) {
+      try {
+        localStorage.removeItem(key);
+      } catch {
+        // Ignore storage restrictions in file previews.
+      }
+    }
+
     const dashboardPage = document.getElementById("dashboard-page");
     const logoutLink = document.getElementById("logout-link");
     const navLinks = document.querySelectorAll(".menu a[data-view]");
@@ -1197,27 +1194,104 @@
     ];
     let schedules;
     try {
-      const savedSchedules = JSON.parse(localStorage.getItem("fcuBellSchedules") || "null");
+      const savedSchedules = JSON.parse(getStoredValue("fcuBellSchedules", "null"));
       schedules = Array.isArray(savedSchedules)
         ? savedSchedules.map(({ audioData, ...schedule }) => schedule)
         : defaultSchedules;
     } catch {
       schedules = defaultSchedules;
-      localStorage.removeItem("fcuBellSchedules");
+      removeStoredValue("fcuBellSchedules");
     }
     let editingId = null;
     let highlightedScheduleId = null;
 
+    function getCurrentUser() {
+      try {
+        const user = JSON.parse(getStoredValue("fcuBellCurrentUser", "{\"username\":\"ADMIN\"}"));
+        return { username: String(user.username || "ADMIN") };
+      } catch {
+        return { username: "ADMIN" };
+      }
+    }
+
+    function getSettingsStorageKey() {
+      const username = getCurrentUser().username.toLowerCase().replace(/[^a-z0-9_-]/g, "_");
+      return `fcuBellSettings:${username}`;
+    }
+
+    function isSameActivityLog(a, b) {
+      if (!a || !b) return false;
+      return String(a.activity || "").toLowerCase() === String(b.activity || "").toLowerCase()
+        && String(a.performedBy || "").toLowerCase() === String(b.performedBy || "").toLowerCase();
+    }
+
+    function dedupeActivityLogs(logs) {
+      return logs.filter((log, index) => !isSameActivityLog(log, logs[index - 1]));
+    }
+
+    function getActivityLogs() {
+      try {
+        const logs = JSON.parse(getStoredValue("fcuBellLogs", "[]"));
+        const list = Array.isArray(logs) ? logs : [];
+        const uniqueLogs = dedupeActivityLogs(list);
+        if (uniqueLogs.length !== list.length) {
+          setStoredValue("fcuBellLogs", JSON.stringify(uniqueLogs.slice(0, 25)));
+        }
+        return uniqueLogs;
+      } catch {
+        return [];
+      }
+    }
+
+    function renderActivityLogs() {
+      const activityTableBody = document.querySelector("#activity-view tbody");
+      if (!activityTableBody) return;
+
+      const logs = getActivityLogs();
+      const todaysActionsCard = document.querySelector("#activity-view .card:nth-child(1) p");
+      const alertsCard = document.querySelector("#activity-view .card:nth-child(2) p");
+      const syncCard = document.querySelector("#activity-view .card:nth-child(3) p");
+
+      if (todaysActionsCard) todaysActionsCard.textContent = String(logs.length);
+      if (alertsCard) alertsCard.textContent = String(logs.filter((log) => log.status === "Needs Attention").length);
+      if (syncCard) syncCard.textContent = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+      activityTableBody.innerHTML = logs.map((log) => `
+        <tr>
+          <td>${log.time || new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</td>
+          <td>${log.activity || log.message || "System event"}</td>
+          <td>${log.performedBy || "System"}</td>
+          <td><span class="status-badge ${log.status === "Needs Attention" ? "pending" : "active"}">${log.status || "Success"}</span></td>
+        </tr>
+      `).join("");
+    }
+
+    function addActivityLog(activity, performedBy = getCurrentUser().username || "ADMIN", status = "Success") {
+      const logs = getActivityLogs();
+      const nextLog = {
+        time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+        activity,
+        performedBy,
+        status
+      };
+      if (isSameActivityLog(nextLog, logs[0])) {
+        renderActivityLogs();
+        return;
+      }
+      logs.unshift(nextLog);
+      setStoredValue("fcuBellLogs", JSON.stringify(logs.slice(0, 25)));
+      renderActivityLogs();
+    }
+
     function showDashboard() {
-      loginPage.style.display = "none";
       dashboardPage.style.display = "flex";
-      localStorage.setItem("fcuBellLoggedIn", "true");
+      setStoredValue("fcuBellLoggedIn", "true");
     }
 
     function showLogin() {
-      loginPage.style.display = "flex";
       dashboardPage.style.display = "none";
-      localStorage.removeItem("fcuBellLoggedIn");
+      removeStoredValue("fcuBellLoggedIn");
+      window.location.href = "login.html";
     }
 
     function showView(viewId) {
@@ -1239,7 +1313,7 @@
 
     function saveSchedules() {
       schedules = schedules.map(({ audioData, ...schedule }) => schedule);
-      localStorage.setItem("fcuBellSchedules", JSON.stringify(schedules));
+      setStoredValue("fcuBellSchedules", JSON.stringify(schedules));
     }
 
     function renderSchedules() {
@@ -1303,12 +1377,12 @@
     function loadSettings() {
       let settings;
       try {
-        settings = JSON.parse(localStorage.getItem("fcuBellSettings") || "null") || {};
+        settings = JSON.parse(getStoredValue(getSettingsStorageKey(), "null")) || {};
       } catch {
         settings = {};
       }
       settings = {
-        displayName: "ADMIN",
+        displayName: getCurrentUser().username,
         email: "",
         phone: "",
         bio: "",
@@ -1476,36 +1550,171 @@
       systemModeDisplay.textContent = "Manual Override";
       if (batteryStatusDisplay) batteryStatusDisplay.textContent = "92% (Active)";
       showActionMessage("Manual bell override triggered successfully.");
-      logEvent("Manual override executed");
+      addActivityLog("Manual bell override triggered", getCurrentUser().username || "ADMIN", "Success");
     }
 
     function triggerEmergencyDetection() {
       systemModeDisplay.textContent = "Emergency";
       if (batteryStatusDisplay) batteryStatusDisplay.textContent = "100% (Backup)";
       showActionMessage("Emergency alert mode activated.");
-      logEvent("Emergency detection activated");
+      addActivityLog("Emergency detection activated", getCurrentUser().username || "ADMIN", "Needs Attention");
     }
 
     function backupAndRestore() {
       saveSchedules();
       showActionMessage("Backup restored and schedules saved.");
-      logEvent("Backup and restore completed");
+      addActivityLog("Backup and restore completed", getCurrentUser().username || "ADMIN", "Success");
     }
 
-    function logEvent(message) {
-      const logs = JSON.parse(localStorage.getItem("fcuBellLogs") || "[]");
-      logs.unshift({ time: new Date().toLocaleString(), message });
-      localStorage.setItem("fcuBellLogs", JSON.stringify(logs.slice(0, 20)));
-    }
+    function setupDashboardUsers() {
+      const tableBody = document.getElementById("dashboard-user-body");
+      const form = document.getElementById("dashboard-user-form");
+      if (!tableBody || !form) return;
 
-    loginForm.addEventListener("submit", (e) => {
-      e.preventDefault();
-      showDashboard();
-      showView("dashboard-view");
-    });
+      const usernameInput = document.getElementById("dashboard-user-username");
+      const passwordInput = document.getElementById("dashboard-user-password");
+      const roleInput = document.getElementById("dashboard-user-role");
+      const statusInput = document.getElementById("dashboard-user-status");
+      const message = document.getElementById("dashboard-user-message");
+      const accountsStorageKey = "fcuBellAccounts";
+      let editingUsername = null;
+      let users;
+
+      try {
+        const savedAccounts = JSON.parse(getStoredValue(accountsStorageKey, "null"));
+        users = Array.isArray(savedAccounts) && savedAccounts.length ? savedAccounts : [
+          { username: "admin", password: "admin123", role: "Administrator", status: "Active", lastLogin: "Never" }
+        ];
+      } catch {
+        users = [{ username: "admin", password: "admin123", role: "Administrator", status: "Active", lastLogin: "Never" }];
+      }
+      users = users.map((user) => ({
+        username: String(user.username || "").trim(),
+        password: String(user.password || ""),
+        role: user.role || "Staff",
+        status: user.status || "Active",
+        lastLogin: user.lastLogin || "Never"
+      })).filter((user) => user.username);
+
+      function saveUsers() {
+        setStoredValue(accountsStorageKey, JSON.stringify(users));
+      }
+
+      function escapeUserValue(value) {
+        return String(value).replace(/[&<>'"]/g, (character) => ({
+          "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;"
+        }[character]));
+      }
+
+      function showUserMessage(text, type = "success") {
+        message.textContent = text;
+        message.className = `message ${type}`;
+      }
+
+      function renderUsers() {
+        const adminCount = users.filter((user) => user.role === "Administrator").length;
+        document.getElementById("dashboard-user-count").textContent = users.length;
+        document.getElementById("dashboard-admin-count").textContent = adminCount;
+        document.getElementById("dashboard-active-user-count").textContent = users.filter((user) => user.status === "Active").length;
+        tableBody.innerHTML = users.length ? users.map((user) => {
+          const onlyAdministrator = user.role === "Administrator" && adminCount === 1;
+          const actionLabel = user.status === "Pending" ? "Approve" : user.status === "Active" ? "Disable" : "Activate";
+          return `<tr>
+            <td>${escapeUserValue(user.username)}</td>
+            <td>${escapeUserValue(user.role)}</td>
+            <td><span class="status-badge ${user.status.toLowerCase()}">${escapeUserValue(user.status)}</span></td>
+            <td>${escapeUserValue(user.lastLogin)}</td>
+            <td class="user-actions">
+              <button type="button" data-user-action="edit" data-username="${escapeUserValue(user.username)}">Edit</button>
+              <button type="button" data-user-action="toggle" data-username="${escapeUserValue(user.username)}">${actionLabel}</button>
+              <button type="button" class="delete-btn" data-user-action="delete" data-username="${escapeUserValue(user.username)}" ${onlyAdministrator ? "disabled title=\"Keep at least one administrator\"" : ""}>Delete</button>
+            </td>
+          </tr>`;
+        }).join("") : '<tr><td colspan="5" class="empty-state">No users yet.</td></tr>';
+        saveUsers();
+      }
+
+      function resetUserForm() {
+        form.reset();
+        form.hidden = true;
+        editingUsername = null;
+        passwordInput.required = false;
+      }
+
+      document.getElementById("dashboard-add-user").addEventListener("click", () => {
+        resetUserForm();
+        form.hidden = false;
+        passwordInput.required = true;
+        usernameInput.focus();
+      });
+
+      document.getElementById("dashboard-cancel-user").addEventListener("click", resetUserForm);
+
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const username = usernameInput.value.trim();
+        const password = passwordInput.value;
+        const wasEditing = Boolean(editingUsername);
+        const duplicate = users.some((user) => user.username.toLowerCase() === username.toLowerCase() && user.username !== editingUsername);
+        if (!username || duplicate) {
+          showUserMessage(duplicate ? "That username is already in use." : "Username is required.", "error");
+          return;
+        }
+        if ((!editingUsername && password.length < 6) || (editingUsername && password && password.length < 6)) {
+          showUserMessage("Password must be at least 6 characters.", "error");
+          return;
+        }
+        const existing = users.find((user) => user.username === editingUsername);
+        const updatedUser = {
+          username,
+          password: password || existing?.password,
+          role: roleInput.value,
+          status: statusInput.value,
+          lastLogin: existing?.lastLogin || "Never"
+        };
+        users = editingUsername
+          ? users.map((user) => user.username === editingUsername ? updatedUser : user)
+          : [...users, updatedUser];
+        resetUserForm();
+        renderUsers();
+        showUserMessage("User saved successfully.");
+        addActivityLog(`User ${wasEditing ? "updated" : "added"}: ${username}`, getCurrentUser().username || "ADMIN", "Success");
+      });
+
+      tableBody.addEventListener("click", (event) => {
+        const button = event.target.closest("button[data-user-action]");
+        if (!button || button.disabled) return;
+        const username = button.dataset.username;
+        const user = users.find((entry) => entry.username === username);
+        if (!user) return;
+
+        if (button.dataset.userAction === "edit") {
+          editingUsername = username;
+          form.hidden = false;
+          usernameInput.value = user.username;
+          roleInput.value = user.role;
+          statusInput.value = user.status;
+          passwordInput.value = "";
+          usernameInput.focus();
+        } else if (button.dataset.userAction === "toggle") {
+          user.status = user.status === "Active" ? "Inactive" : "Active";
+          renderUsers();
+          showUserMessage(`User ${user.status === "Active" ? "activated" : "disabled"} successfully.`);
+          addActivityLog(`User ${user.status === "Active" ? "activated" : "disabled"}: ${username}`, getCurrentUser().username || "ADMIN", "Success");
+        } else if (button.dataset.userAction === "delete" && confirm(`Delete the account for ${username}?`)) {
+          users = users.filter((entry) => entry.username !== username);
+          renderUsers();
+          showUserMessage("User deleted successfully.");
+          addActivityLog(`User deleted: ${username}`, getCurrentUser().username || "ADMIN", "Success");
+        }
+      });
+
+      renderUsers();
+    }
 
     logoutLink.addEventListener("click", (e) => {
       e.preventDefault();
+      addActivityLog("Signed out", getCurrentUser().username || "ADMIN", "Success");
       showLogin();
     });
 
@@ -1538,13 +1747,14 @@
         language: settingsLanguage.value,
         defaultPeriod: settingsDefaultPeriod.value,
       };
+      addActivityLog("Updated account settings", getCurrentUser().username || "ADMIN", "Success");
       if (!settings.displayName) return;
       if (settingsPassword.value) settings.passwordUpdatedAt = new Date().toISOString();
       try {
-        localStorage.setItem("fcuBellSettings", JSON.stringify(settings));
+        setStoredValue(getSettingsStorageKey(), JSON.stringify(settings));
       } catch {
         settings.avatar = "pfp.jpg";
-        localStorage.setItem("fcuBellSettings", JSON.stringify(settings));
+        setStoredValue(getSettingsStorageKey(), JSON.stringify(settings));
         settingsAvatarPreview.src = settings.avatar;
       }
       document.querySelector(".profile-section h2").textContent = settings.displayName;
@@ -1556,7 +1766,12 @@
       settingsMessage.className = "message success";
     });
 
-    scheduleForm.addEventListener("submit", addOrUpdateSchedule);
+    scheduleForm.addEventListener("submit", (event) => {
+      addOrUpdateSchedule(event);
+      if (!event.defaultPrevented) {
+        addActivityLog("Saved bell schedule", getCurrentUser().username || "ADMIN", "Success");
+      }
+    });
 
     scheduleTimeInput.addEventListener("input", () => {
       scheduleTimeInput.value = scheduleTimeInput.value.replace(/[^0-9:]/g, "").slice(0, 5);
@@ -1567,6 +1782,7 @@
     manualOverrideBtn.addEventListener("click", triggerManualOverride);
     emergencyBtn.addEventListener("click", triggerEmergencyDetection);
     backupBtn.addEventListener("click", backupAndRestore);
+    setupDashboardUsers();
 
     document.addEventListener("click", (e) => {
       const button = e.target.closest("button");
@@ -1582,15 +1798,16 @@
 
     setInterval(updateDashboardStatus, 1000);
     renderSchedules();
+    renderActivityLogs();
     updateDashboardStatus();
     loadSettings();
     document.querySelector(".profile-section h2").textContent = settingsDisplayName.value;
 
-    if (localStorage.getItem("fcuBellLoggedIn") === "true") {
+    if (getStoredValue("fcuBellLoggedIn") !== "true") {
+      showLogin();
+    } else {
       showDashboard();
       showView("dashboard-view");
-    } else {
-      showLogin();
     }
   </script>
 </body>

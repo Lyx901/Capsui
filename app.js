@@ -102,17 +102,143 @@
     render();
   }
 
-  document.querySelectorAll(".user-action").forEach((button) => {
-    button.addEventListener("click", () => {
-      const row = button.closest("tr");
-      if (button.dataset.action === "approve") {
-        row.querySelector(".status-badge").textContent = "Active";
-        row.querySelector(".status-badge").className = "status-badge active";
-        button.remove();
-        showMessage("User approved successfully.");
-      } else {
-        showMessage(`Editing ${row.cells[0].textContent}.`);
+  const userTableBody = document.getElementById("user-table-body");
+  if (userTableBody) {
+    const accountsStorageKey = "fcuBellAccounts";
+    const userForm = document.getElementById("user-form");
+    const usernameInput = document.getElementById("user-username");
+    const passwordInput = document.getElementById("user-password");
+    const roleInput = document.getElementById("user-role");
+    const statusInput = document.getElementById("user-status");
+    let users = readUsers();
+    let editingUsername = null;
+
+    function readUsers() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(accountsStorageKey));
+        if (Array.isArray(saved) && saved.length) {
+          return saved.map((user) => ({
+            username: String(user.username || "").trim(),
+            password: String(user.password || ""),
+            role: user.role || "Staff",
+            status: user.status || "Active",
+            lastLogin: user.lastLogin || "Never"
+          })).filter((user) => user.username);
+        }
+      } catch {}
+      return [{ username: "admin", password: "admin123", role: "Administrator", status: "Active", lastLogin: "Never" }];
+    }
+
+    function saveUsers() {
+      localStorage.setItem(accountsStorageKey, JSON.stringify(users));
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>'"]/g, (character) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;"
+      }[character]));
+    }
+
+    function renderUsers() {
+      const admins = users.filter((user) => user.role === "Administrator").length;
+      const active = users.filter((user) => user.status === "Active").length;
+      document.getElementById("user-count").textContent = users.length;
+      document.getElementById("admin-count").textContent = admins;
+      document.getElementById("active-user-count").textContent = active;
+      userTableBody.innerHTML = users.length ? users.map((user) => {
+        const statusClass = user.status.toLowerCase();
+        const isOnlyAdministrator = user.role === "Administrator" && admins === 1;
+        return `<tr>
+          <td>${escapeHtml(user.username)}</td>
+          <td>${escapeHtml(user.role)}</td>
+          <td><span class="status-badge ${statusClass}">${escapeHtml(user.status)}</span></td>
+          <td>${escapeHtml(user.lastLogin)}</td>
+          <td class="user-actions">
+            <button type="button" class="user-action" data-action="edit" data-username="${escapeHtml(user.username)}">Edit</button>
+            <button type="button" class="user-action" data-action="toggle" data-username="${escapeHtml(user.username)}">${user.status === "Active" ? "Disable" : "Activate"}</button>
+            <button type="button" class="user-action delete-btn" data-action="delete" data-username="${escapeHtml(user.username)}" ${isOnlyAdministrator ? "disabled title=\"Keep at least one administrator\"" : ""}>Delete</button>
+          </td>
+        </tr>`;
+      }).join("") : '<tr><td colspan="5" class="empty-state">No users yet.</td></tr>';
+      saveUsers();
+    }
+
+    function resetUserForm() {
+      userForm.reset();
+      userForm.hidden = true;
+      editingUsername = null;
+      passwordInput.required = false;
+    }
+
+    document.getElementById("add-user").addEventListener("click", () => {
+      resetUserForm();
+      userForm.hidden = false;
+      passwordInput.required = true;
+      usernameInput.focus();
+    });
+
+    document.getElementById("cancel-user").addEventListener("click", resetUserForm);
+
+    userForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const username = usernameInput.value.trim();
+      const password = passwordInput.value;
+      const duplicate = users.some((user) => user.username.toLowerCase() === username.toLowerCase() && user.username !== editingUsername);
+      if (!username || duplicate) {
+        showMessage(duplicate ? "That username is already in use." : "Username is required.");
+        return;
+      }
+      if (!editingUsername && password.length < 6) {
+        showMessage("Password must be at least 6 characters.");
+        return;
+      }
+      if (editingUsername && password && password.length < 6) {
+        showMessage("Password must be at least 6 characters.");
+        return;
+      }
+      const existing = users.find((user) => user.username === editingUsername);
+      const updatedUser = {
+        username,
+        password: password || existing?.password,
+        role: roleInput.value,
+        status: statusInput.value,
+        lastLogin: existing?.lastLogin || "Never"
+      };
+      users = editingUsername ? users.map((user) => user.username === editingUsername ? updatedUser : user) : [...users, updatedUser];
+      saveUsers();
+      renderUsers();
+      resetUserForm();
+      showMessage("User saved successfully.");
+    });
+
+    userTableBody.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-username]");
+      if (!button || button.disabled) return;
+      const username = button.dataset.username;
+      const user = users.find((entry) => entry.username === username);
+      if (!user) return;
+      if (button.dataset.action === "edit") {
+        editingUsername = username;
+        userForm.hidden = false;
+        usernameInput.value = user.username;
+        roleInput.value = user.role;
+        statusInput.value = user.status;
+        passwordInput.value = "";
+        passwordInput.required = false;
+        usernameInput.focus();
+      } else if (button.dataset.action === "toggle") {
+        user.status = user.status === "Active" ? "Inactive" : "Active";
+        saveUsers();
+        renderUsers();
+        showMessage(`User ${user.status === "Active" ? "activated" : "disabled"} successfully.`);
+      } else if (button.dataset.action === "delete" && confirm(`Delete the account for ${username}?`)) {
+        users = users.filter((entry) => entry.username !== username);
+        saveUsers();
+        renderUsers();
+        showMessage("User deleted successfully.");
       }
     });
-  });
+
+    renderUsers();
+  }
 })();

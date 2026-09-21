@@ -58,22 +58,45 @@
         <div class="card">
           <i class="fa-solid fa-users"></i>
           <h3>Total Users</h3>
-          <p>12</p>
+          <p id="user-count">0</p>
         </div>
         <div class="card">
           <i class="fa-solid fa-user-shield"></i>
           <h3>Admin Accounts</h3>
-          <p>3</p>
+          <p id="admin-count">0</p>
         </div>
         <div class="card">
           <i class="fa-solid fa-circle-check"></i>
           <h3>Active Users</h3>
-          <p>10</p>
+          <p id="active-user-count">0</p>
         </div>
       </section>
 
       <section class="table-section">
-        <h2>Account Overview</h2>
+        <div class="section-heading">
+          <h2>Account Overview</h2>
+          <button type="button" id="add-user">Add User</button>
+        </div>
+        <form id="user-form" class="schedule-form" hidden>
+          <div class="form-row">
+            <input type="text" id="user-username" placeholder="Username" autocomplete="off" required />
+            <input type="password" id="user-password" placeholder="Password (min. 6 characters)" autocomplete="new-password" />
+            <select id="user-role" aria-label="Role">
+              <option value="Staff">Staff</option>
+              <option value="Administrator">Administrator</option>
+              <option value="Viewer">Viewer</option>
+            </select>
+            <select id="user-status" aria-label="Status">
+              <option value="Active">Active</option>
+              <option value="Pending">Pending</option>
+              <option value="Inactive">Inactive</option>
+            </select>
+          </div>
+          <div class="form-actions">
+            <button type="submit">Save User</button>
+            <button type="button" id="cancel-user" class="secondary-btn">Cancel</button>
+          </div>
+        </form>
         <table>
           <thead>
             <tr>
@@ -84,29 +107,7 @@
               <th>Action</th>
             </tr>
           </thead>
-          <tbody>
-            <tr>
-              <td>Maria Santos</td>
-              <td>Administrator</td>
-              <td><span class="status-badge active">Active</span></td>
-              <td>Today, 07:20 AM</td>
-              <td><button type="button" class="user-action">Edit</button></td>
-            </tr>
-            <tr>
-              <td>John Cruz</td>
-              <td>Staff</td>
-              <td><span class="status-badge active">Active</span></td>
-              <td>Yesterday, 04:15 PM</td>
-              <td><button type="button" class="user-action">Edit</button></td>
-            </tr>
-            <tr>
-              <td>Rosa Dela Vega</td>
-              <td>Viewer</td>
-              <td><span class="status-badge pending">Pending</span></td>
-              <td>Never</td>
-              <td><button type="button" class="user-action" data-action="approve">Approve</button></td>
-            </tr>
-          </tbody>
+          <tbody id="user-table-body"></tbody>
         </table>
       </section>
     </main>
