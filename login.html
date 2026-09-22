@@ -98,7 +98,6 @@
   <script>
     const loginForm = document.getElementById("login-form");
     const registerForm = document.getElementById("register-form");
-    const accountsStorageKey = "fcuBellAccounts";
 
     // Error message elements
     const loginUsernameMessage = document.getElementById("login-username-message");
@@ -106,16 +105,6 @@
     const registerUsernameMessage = document.getElementById("register-username-message");
     const registerPasswordMessage = document.getElementById("register-password-message");
     const registerConfirmMessage = document.getElementById("register-password-confirm-message");
-
-    const readAccounts = () => {
-      try {
-        const savedAccounts = JSON.parse(localStorage.getItem(accountsStorageKey));
-        if (Array.isArray(savedAccounts) && savedAccounts.length) {
-          return savedAccounts;
-        }
-      } catch {}
-      return [{ username: "admin", password: "admin123" }];
-    };
 
     // Password toggle
     document.querySelectorAll(".password-toggle").forEach((toggle) => {
@@ -152,7 +141,7 @@
     }
 
     // LOGIN
-    loginForm.addEventListener("submit", (event) => {
+    loginForm.addEventListener("submit", async (event) => {
       event.preventDefault();
       clearMessages();
 
@@ -168,31 +157,21 @@
         return;
       }
 
-      const account = readAccounts().find((entry) => entry.username.toLowerCase() === username.toLowerCase());
-      if (!account) {
-  loginUsernameMessage.textContent = "Invalid username.";
-  return;
-    }
-      if (account.status === "Pending") {
-        loginUsernameMessage.textContent = "This account is Pending Review.";
-        return;
-    }
-      if (account.status === "Inactive") {
-        loginUsernameMessage.textContent = "This account is not active.";
-        return;
-    }
-      if (account.password !== password) {
-        loginPasswordMessage.textContent = "Invalid password.";
-        return;
+      try {
+        const response = await fetch("/handleLogin", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          credentials: "same-origin",
+          body: new URLSearchParams({ username, password })
+        });
+        if (!response.ok) {
+          loginPasswordMessage.textContent = "Invalid username or password.";
+          return;
+        }
+        window.location.href = "/";
+      } catch {
+        loginPasswordMessage.textContent = "Unable to reach the bell system.";
       }
-
-      const accounts = readAccounts().map((entry) => entry.username.toLowerCase() === username.toLowerCase()
-        ? { ...entry, lastLogin: new Date().toLocaleString() }
-        : entry);
-      localStorage.setItem(accountsStorageKey, JSON.stringify(accounts));
-      localStorage.setItem("fcuBellLoggedIn", "true");
-      localStorage.setItem("fcuBellCurrentUser", JSON.stringify({ username }));
-      window.location.href = "index.html";
     });
 
     // REGISTER
@@ -200,31 +179,7 @@
       event.preventDefault();
       clearMessages();
 
-      const username = document.getElementById("register-username").value.trim();
-      const password = document.getElementById("register-password").value;
-      const confirmation = document.getElementById("register-password-confirm").value;
-      const accounts = readAccounts();
-
-      if (accounts.some((entry) => entry.username.toLowerCase() === username.toLowerCase())) {
-        registerUsernameMessage.textContent = "That username is already in use.";
-        return;
-      }
-      if (password !== confirmation) {
-        registerConfirmMessage.textContent = "Passwords do not match.";
-        return;
-      }
-      if (password.length < 6) {
-        registerPasswordMessage.textContent = "Password must be at least 6 characters.";
-        return;
-      }
-
-      accounts.push({ username, password });
-      localStorage.setItem(accountsStorageKey, JSON.stringify(accounts));
-      registerForm.reset();
-      document.getElementById("show-login").click();
-      document.getElementById("login-username").value = username;
-      loginUsernameMessage.textContent = "Account created. You can now sign in.";
-      loginUsernameMessage.classList.add("success");
+      registerUsernameMessage.textContent = "Accounts are managed on the bell controller.";
     });
   </script>
 </body>

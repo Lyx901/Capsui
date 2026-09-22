@@ -1,4 +1,27 @@
 (() => {
+  const apiEndpoints = [
+    { endpoint: "/", method: "GET", auth: "Cookie (Session)", description: 'Serves captive portal <span class="inline-tag">login.html</span> or <span class="inline-tag">dashboard.html</span>' },
+    { endpoint: "/api/telemetry", method: "GET", auth: "Cookie (Session)", description: "Device time, WiFi mode, sniffer status, and connection state" },
+    { endpoint: "/api/schedule", method: "GET / POST", auth: "Cookie (Session)", description: "Fetches or updates JSON schedule configuration (chunk-safe)" },
+    { endpoint: "/api/attendance", method: "GET", auth: "Cookie (Session)", description: 'Downloads parsed attendance logs from <span class="inline-tag">/data/logs.csv</span>' },
+    { endpoint: "/api/attendance/status", method: "GET", auth: "Cookie (Session)", description: "Returns current promiscuous mode / sniffer window state" },
+    { endpoint: "/api/config", method: "GET / POST", auth: "Cookie (Session)", description: "Manages WiFi AP/Station credentials" },
+    { endpoint: "/handleLogin", method: "POST", auth: "None", description: 'Authenticates session credentials via client <span class="inline-tag">fetch()</span>' },
+    { endpoint: "/ring", method: "GET", auth: "Cookie (Session)", description: 'Pushes manual chime request to <span class="inline-tag">xAudioQueue</span>' },
+    { endpoint: "/logout", method: "GET", auth: "Cookie (Session)", description: "Clears session cookie and invalidates session token" }
+  ];
+
+  const endpointTableBody = document.querySelector(".api-endpoints-table tbody");
+  if (endpointTableBody) {
+    endpointTableBody.innerHTML = apiEndpoints.map((api) => `
+      <tr>
+        <td><span class="endpoint-pill">${api.endpoint}</span></td>
+        <td>${api.method}</td>
+        <td>${api.auth}</td>
+        <td>${api.description}</td>
+      </tr>`).join("");
+  }
+
   document.querySelectorAll(".logout a").forEach((link) => {
     link.addEventListener("click", () => localStorage.removeItem("fcuBellLoggedIn"));
   });

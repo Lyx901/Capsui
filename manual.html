@@ -92,66 +92,12 @@
                 <th>Description</th>
               </tr>
             </thead>
-            <tbody>
-              <tr>
-                <td><span class="endpoint-pill">/</span></td>
-                <td>GET</td>
-                <td>Cookie<br />(Session)</td>
-                <td>Serves captive portal <span class="inline-tag">login.html</span> or <span class="inline-tag">dashboard.html</span></td>
-              </tr>
-              <tr>
-                <td><span class="endpoint-pill">/api/telemetry</span></td>
-                <td>GET</td>
-                <td>Cookie<br />(Session)</td>
-                <td>Device time, WiFi mode, sniffer status, and connection state</td>
-              </tr>
-              <tr>
-                <td><span class="endpoint-pill">/api/schedule</span></td>
-                <td>GET /<br />POST</td>
-                <td>Cookie<br />(Session)</td>
-                <td>Fetches or updates JSON schedule configuration (chunk-safe)</td>
-              </tr>
-              <tr>
-                <td><span class="endpoint-pill">/api/attendance</span></td>
-                <td>GET</td>
-                <td>Cookie<br />(Session)</td>
-                <td>Downloads parsed attendance logs from <span class="inline-tag">/data/logs.csv</span></td>
-              </tr>
-              <tr>
-                <td><span class="endpoint-pill">/api/attendance/status</span></td>
-                <td>GET</td>
-                <td>Cookie<br />(Session)</td>
-                <td>Returns current promiscuous mode / sniffer window state</td>
-              </tr>
-              <tr>
-                <td><span class="endpoint-pill">/api/config</span></td>
-                <td>GET /<br />POST</td>
-                <td>Cookie<br />(Session)</td>
-                <td>Manages WiFi AP/Station credentials</td>
-              </tr>
-              <tr>
-                <td><span class="endpoint-pill">/handleLogin</span></td>
-                <td>POST</td>
-                <td>None</td>
-                <td>Authenticates session credentials via client <span class="inline-tag">fetch()</span></td>
-              </tr>
-              <tr>
-                <td><span class="endpoint-pill">/ring</span></td>
-                <td>GET</td>
-                <td>Cookie<br />(Session)</td>
-                <td>Pushes manual chime request to <span class="inline-tag">xAudioQueue</span></td>
-              </tr>
-              <tr>
-                <td><span class="endpoint-pill">/logout</span></td>
-                <td>GET</td>
-                <td>Cookie<br />(Session)</td>
-                <td>Clears session cookie and invalidates session token</td>
-              </tr>
-            </tbody>
+            <tbody></tbody>
           </table>
         </div>
       </section>
     </main>
   </section>
+  <script src="app.js"></script>
 </body>
 </html>

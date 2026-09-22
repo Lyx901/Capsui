@@ -1291,7 +1291,7 @@
     function showLogin() {
       dashboardPage.style.display = "none";
       removeStoredValue("fcuBellLoggedIn");
-      window.location.href = "login.html";
+      window.location.href = "/";
     }
 
     function showView(viewId) {
@@ -1472,6 +1472,40 @@
       schedulePeriodInput.value = period;
     }
 
+    function normalizeServerTime(value) {
+      const match = String(value || "").match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+      if (!match) return String(value || "08:00").slice(0, 5);
+      let hour = Number(match[1]) % 12;
+      if (match[3].toUpperCase() === "PM") hour += 12;
+      return `${String(hour).padStart(2, "0")}:${match[2]}`;
+    }
+
+    function deviceSchedulePayload() {
+      return { schedules: schedules.map((item) => ({
+        id: item.id,
+        subject: item.description,
+        days: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+        startTime: normalizeServerTime(item.time),
+        endTime: normalizeServerTime(item.time),
+        chimeStart: "/audio/chime.mp3",
+        chimeEnd: "/audio/chime.mp3"
+      })) };
+    }
+
+    async function refreshSchedulesFromDevice() {
+      const response = await fetch("/api/schedule", { cache: "no-store", credentials: "same-origin" });
+      if (!response.ok) return;
+      const data = await response.json();
+      if (!Array.isArray(data.schedules)) return;
+      schedules = data.schedules.map((item) => ({
+        id: Number(item.id),
+        time: item.startTime || "08:00",
+        description: item.subject || "Untitled",
+        audio: item.chimeStart || "/audio/chime.mp3"
+      }));
+      renderSchedules();
+    }
+
     async function addOrUpdateSchedule(e) {
       e.preventDefault();
       let formattedTime;
@@ -1512,6 +1546,13 @@
           schedules.unshift({ id: highlightedScheduleId, time: formattedTime, description, audio });
         }
 
+        const response = await fetch("/api/schedule", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify(deviceSchedulePayload())
+        });
+        if (!response.ok) throw new Error("The controller could not save the schedule.");
         saveSchedules();
         renderSchedules();
         resetScheduleForm();
@@ -1542,15 +1583,25 @@
       if (editingId === id) {
         resetScheduleForm();
       }
-      renderSchedules();
-      showMessage("Schedule deleted successfully.");
+      fetch("/api/schedule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify(deviceSchedulePayload())
+      }).then((response) => {
+        if (!response.ok) throw new Error("The controller could not delete the schedule.");
+        renderSchedules();
+        showMessage("Schedule deleted successfully.");
+      }).catch((error) => showMessage(error.message, "error"));
     }
 
     function triggerManualOverride() {
-      systemModeDisplay.textContent = "Manual Override";
-      if (batteryStatusDisplay) batteryStatusDisplay.textContent = "92% (Active)";
-      showActionMessage("Manual bell override triggered successfully.");
-      addActivityLog("Manual bell override triggered", getCurrentUser().username || "ADMIN", "Success");
+      fetch("/ring", { credentials: "same-origin" }).then((response) => {
+        if (!response.ok) throw new Error("The controller rejected the ring request.");
+        systemModeDisplay.textContent = "Manual Override";
+        showActionMessage("Bell request queued.");
+        addActivityLog("Manual bell override triggered", getCurrentUser().username || "ADMIN", "Success");
+      }).catch((error) => showActionMessage(error.message, "error"));
     }
 
     function triggerEmergencyDetection() {
@@ -1714,8 +1765,7 @@
 
     logoutLink.addEventListener("click", (e) => {
       e.preventDefault();
-      addActivityLog("Signed out", getCurrentUser().username || "ADMIN", "Success");
-      showLogin();
+      fetch("/logout", { credentials: "same-origin" }).finally(showLogin);
     });
 
     viewLinks.forEach((link) => {
@@ -1803,12 +1853,18 @@
     loadSettings();
     document.querySelector(".profile-section h2").textContent = settingsDisplayName.value;
 
-    if (getStoredValue("fcuBellLoggedIn") !== "true") {
-      showLogin();
-    } else {
-      showDashboard();
-      showView("dashboard-view");
-    }
+    fetch("/api/telemetry", { cache: "no-store", credentials: "same-origin" })
+      .then((response) => {
+        if (!response.ok) throw new Error("Not authenticated");
+        return response.json();
+      })
+      .then((telemetry) => {
+        showDashboard();
+        showView("dashboard-view");
+        if (telemetry.sd === false) showActionMessage("SD card unavailable. Schedule and attendance storage are offline.", "error");
+        refreshSchedulesFromDevice().catch(() => {});
+      })
+      .catch(showLogin);
   </script>
 </body>
 </html>
